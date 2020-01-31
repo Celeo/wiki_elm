@@ -1,0 +1,13 @@
+[package]
+name = "back"
+version = "0.1.0"
+authors = ["Celeo <celeodor@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+log = "0.4"
+pretty_env_logger = "0.4.0"
+rweb = "0.4.0"
+rusqlite = "0.21.0"
+serde = { version = "1.0.104", features = ["derive"]}
+tokio = "0.2.11"
