@@ -1,34 +1,7 @@
-use rweb::{get, reply, serve, Filter};
-use serde::{Deserialize, Serialize};
 use std::env;
+use warp::Filter;
 
-#[get("/")]
-#[cors(origins("*"))]
-fn index() -> &'static str {
-    "Index page"
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct Product {
-    id: String,
-    title: String,
-}
-
-#[get("/products")]
-#[cors(origins("*"))]
-fn products() -> reply::Json {
-    let products = vec![
-        Product {
-            id: "1".to_owned(),
-            title: "AAA".to_owned(),
-        },
-        Product {
-            id: "2".to_owned(),
-            title: "BBB".to_owned(),
-        },
-    ];
-    reply::json(&products)
-}
+mod models;
 
 #[tokio::main]
 async fn main() {
@@ -36,7 +9,35 @@ async fn main() {
         env::set_var("RUST_LOG", "info");
     }
     pretty_env_logger::init();
-    serve(index().or(products()))
-        .run(([127, 0, 0, 1], 5000))
-        .await;
+
+    let filters = all_filters();
+    warp::serve(filters).run(([127, 0, 0, 1], 5000)).await;
+}
+
+pub fn all_filters() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+    let articles_list = warp::path!("articles")
+        .and(warp::get())
+        .and_then(handlers::articles_list);
+
+    let articles_create = warp::path!("articles")
+        .and(warp::post())
+        .and(warp::body::json())
+        .and_then(handlers::articles_create);
+
+    articles_list.or(articles_create)
+}
+
+mod handlers {
+    use std::convert::Infallible;
+    use warp::Reply;
+
+    pub async fn articles_list() -> Result<impl Reply, Infallible> {
+        // TODO
+        Ok(warp::http::StatusCode::INTERNAL_SERVER_ERROR)
+    }
+
+    pub async fn articles_create(_data: serde_json::Value) -> Result<impl Reply, Infallible> {
+        // TODO
+        Ok(warp::http::StatusCode::INTERNAL_SERVER_ERROR)
+    }
 }
