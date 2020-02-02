@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 
 from pydantic import BaseModel
 
@@ -22,8 +22,8 @@ class ArticleCreate(BaseModel):
 
 class ArticleUpdate(BaseModel):
     id: int
-    title: str
-    content: str
+    title: Optional[str]
+    content: Optional[str]
 
 
 class UserBase(BaseModel):

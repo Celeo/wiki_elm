@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import List
 
 import bcrypt
@@ -35,13 +36,15 @@ def check_user(db: Session, user: schemas.UserLogin) -> bool:
 
 
 def create_article(db: Session, article: schemas.ArticleCreate, creator_id: int):
-    new_article = models.Article(**article.dict(), created_by=creator_id)
+    new_article = models.Article(**article.dict(), created_by=creator_id, time_created=datetime.utcnow())
     db.add(new_article)
     db.commit()
 
 
 def update_article(db: Session, article: schemas.ArticleUpdate):
     from_db = get_article(db, article.id)
-    from_db.title = article.title
-    from_db.content = article.content
+    if article.title:
+        from_db.title = article.title
+    if article.content:
+        from_db.content = article.content
     db.commit()
