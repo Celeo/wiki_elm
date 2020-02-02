@@ -1,3 +1,5 @@
-back/target
+back/venv
+*.pyc
+__pycache__
 *.db
 front/elm-stuff
