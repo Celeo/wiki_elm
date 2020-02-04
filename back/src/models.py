@@ -14,6 +14,12 @@ class User(Base):
 
     articles_created = relationship('Article', back_populates='creator')
 
+    def to_dict(self) -> dict:
+        return {
+            'id': self.id,
+            'name': self.name
+        }
+
 
 class Article(Base):
 

@@ -3,3 +3,4 @@ back/venv
 __pycache__
 *.db
 front/elm-stuff
+.env
