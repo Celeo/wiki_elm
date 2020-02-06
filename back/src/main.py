@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 import os
 import sys
-from typing import List
+from typing import Generator, List
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, Depends
@@ -9,6 +9,7 @@ from fastapi.exceptions import HTTPException
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 import jwt
 from jwt import PyJWTError
+from six import Iterator
 from sqlalchemy.orm import Session
 from starlette.status import HTTP_400_BAD_REQUEST, HTTP_401_UNAUTHORIZED
 
@@ -36,7 +37,14 @@ if not JWT_SECRET:
     sys.exit(1)
 
 
-def get_db():
+def get_db() -> Generator[SessionLocal]:
+    """Yield a connection to the database.
+
+    This connection is closed after the calling method returns.
+
+    Returns:
+        Generator[SessionLocal]: db connection
+    """
     try:
         db = SessionLocal()
         yield db
@@ -44,7 +52,17 @@ def get_db():
         db.close()
 
 
-def create_access_token(*, data: models.User, expires_delta: timedelta = None) -> str:
+def create_access_token(*, data: models.User, expires_delta: timedelta = None) -> bytes:
+    """Create an access token for the user's login.
+
+    Args:
+        data (models.User): the user to create the token for
+        expires_delta (timedelta): optional override for
+            the duration of the token
+
+    Returns:
+        bytes: JWT
+    """
     to_encode = data.to_dict()
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
@@ -55,6 +73,19 @@ def create_access_token(*, data: models.User, expires_delta: timedelta = None) -
 
 
 def decode_token(token: str, db: Session) -> models.User:
+    """Returns the user for the token.
+
+    Args:
+        token (str): JWT
+        db (Session): database connection
+
+    Returns:
+        models.User: user for the token
+
+    Raises:
+        HTTPException: if the token couldn't be decoded
+            or didn't match a user
+    """
     credentials_exception = HTTPException(
         status_code=HTTP_401_UNAUTHORIZED,
         detail='Could not validate credentials',
@@ -73,15 +104,27 @@ def decode_token(token: str, db: Session) -> models.User:
     return user
 
 
-async def get_current_user(token: str = Depends(oauth2_schema), db: Session = Depends(get_db)) -> models.User:
-    user = decode_token(token, db)
-    if not user:
-        raise HTTPException(
-            status_code=HTTP_401_UNAUTHORIZED,
-            detail='Invalid authentication credentials',
-            headers={'WWW-Authenticate': 'Bearer'}
-        )
-    return user
+async def get_current_user(
+    token: str = Depends(oauth2_schema),
+    db: Session = Depends(get_db)
+) -> models.User:
+    """Get a user for the token.
+
+    This method gets the user's token through a `Depend` and processeses it
+    into a `models.User` object (if it's valid).
+
+    Args:
+        token (str): user's session token ('Authorization' header)
+        db (Session): database connection
+
+    Returns:
+        models.User: user for the token
+
+    Raises:
+        HTTPException: if the token couldn't be decoded
+            or didn't match a user
+    """
+    return decode_token(token, db)
 
 
 @app.post('/token')
@@ -89,6 +132,15 @@ async def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
 ) -> dict:
+    """Endpoint: logs in a user
+
+    Args:
+        form_data (OAuth2PasswordRequestForm): login form submission data
+        db (Session): database connection
+
+    Returns:
+        dict: the generated OAuth token information
+    """
     user = crud.check_user(db, form_data.username, form_data.password)
     if not user:
         raise HTTPException(
@@ -103,7 +155,15 @@ async def login(
 
 
 @app.get('/users/me')
-async def get_current_username(user: models.User = Depends(get_current_user)):
+async def get_current_username(user: models.User = Depends(get_current_user)) -> str:
+    """Endpoint: returns the current user's name
+
+    Args:
+        user (models.User): current user (through Dependency on token)
+
+    Returns:
+        str: user's name
+    """
     return user.name
 
 
@@ -113,7 +173,15 @@ async def get_current_username(user: models.User = Depends(get_current_user)):
 
 
 @app.get('/articles', response_model=List[schemas.Article])
-async def articles_list(db: Session = Depends(get_db)) -> dict:
+async def articles_list(db: Session = Depends(get_db)) -> List[models.Article]:
+    """Returns a list of all articles.
+
+    Args:
+        db (Session): database connection
+
+    Returns:
+        List[models.Article]: articles
+    """
     return db.query(models.Article).all()
 
 
@@ -123,6 +191,16 @@ async def articles_create(
     db: Session = Depends(get_db),
     user: models.User = Depends(get_current_user)
 ) -> dict:
+    """Creates a new article.
+
+    Args:
+        article (schemas.ArticleCreate): creation data
+        db (Session): database connection
+        user (models.User): current user
+
+    Returns:
+        dict: empty dict
+    """
     crud.create_article(db, article, user.id)
     return {}
 
@@ -134,6 +212,14 @@ async def article_update(
     db: Session = Depends(get_db),
     _user: models.User = Depends(get_current_user)
 ) -> dict:
+    """Updates an existing article.
+
+    Args:
+        id (int): id of the article
+        article (schemas.ArticleUpdate): new data
+        db (Session): database connection
+        _user (models.User): current user
+    """
     article.id = id
     crud.update_article(db, article)
     return {}
