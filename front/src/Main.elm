@@ -1,53 +1,63 @@
 module Main exposing (main)
 
-import Browser
+import Browser exposing (Document)
 import Html exposing (Html, pre, text)
 import Http
-import Json.Decode exposing (Decoder, field, list, map2, string)
+import Json.Decode exposing (Decoder, field, int, list, map2, string)
 
 
 main : Program () Model Msg
 main =
-    Browser.element
+    Browser.document
         { init = init
         , view = view
         , update = update
-        , subscriptions = subscriptions
+        , subscriptions = \_ -> Sub.none
         }
 
 
 type Model
     = Failure
     | Loading
-    | Success (List Product)
+    | Success (List ArticleShort)
 
 
-init : () -> ( Model, Cmd Msg )
+init : flags -> ( Model, Cmd Msg )
 init _ =
     ( Loading
     , Http.get
-        { url = "http://localhost:5000/products"
-        , expect = Http.expectJson GotText (list productDecoder)
+        { url = "http://localhost:8000/articles"
+        , expect = Http.expectJson GotText (list articleShortDecoder)
         }
     )
 
 
-type alias Product =
-    { id : String
+type alias ArticleShort =
+    { id : Int
     , title : String
     }
 
 
-productDecoder : Decoder Product
-productDecoder =
+
+-- type alias Article =
+--     { id : Int
+--     , title : String
+--     , content : String
+--     , created_by : Int
+--     , time_created : String
+--     }
+
+
+articleShortDecoder : Decoder ArticleShort
+articleShortDecoder =
     map2
-        Product
-        (field "id" string)
+        ArticleShort
+        (field "id" int)
         (field "title" string)
 
 
 type Msg
-    = GotText (Result Http.Error (List Product))
+    = GotText (Result Http.Error (List ArticleShort))
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -62,13 +72,15 @@ update msg _ =
                     ( Failure, Cmd.none )
 
 
-subscriptions : Model -> Sub Msg
-subscriptions _ =
-    Sub.none
-
-
-view : Model -> Html Msg
+view : Model -> Document Msg
 view model =
+    { title = "Wiki"
+    , body = [ mainView model ]
+    }
+
+
+mainView : Model -> Html Msg
+mainView model =
     case model of
         Failure ->
             text "Http fetch failed"
@@ -77,4 +89,4 @@ view model =
             text "Loading ..."
 
         Success fullText ->
-            pre [] [ text (String.join ", " (List.map Debug.toString fullText)) ]
+            pre [] [ text <| String.join ", " <| List.map Debug.toString fullText ]
