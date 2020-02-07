@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 import os
 import sys
-from typing import List
+from typing import Any, List
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, Depends
@@ -10,6 +10,7 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 import jwt
 from jwt import PyJWTError
 from sqlalchemy.orm import Session
+from starlette.middleware.cors import CORSMiddleware
 from starlette.status import HTTP_400_BAD_REQUEST, HTTP_401_UNAUTHORIZED
 
 from . import models, schemas, crud
@@ -20,16 +21,22 @@ from .db import SessionLocal, engine
 # Setup
 # =============================
 
-
-if os.path.exists('.env'):
-    load_dotenv()
-
 app = FastAPI()
 models.Base.metadata.create_all(bind=engine)
 oauth2_schema = OAuth2PasswordBearer(tokenUrl='/token')
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=['*'],
+    allow_credentials=True,
+    allow_methods=['*'],
+    allow_headers=['*'],
+)
 
 JWT_ALGORITHM = 'HS256'
 JWT_EXPIRATION_MINUTES = 30
+
+if os.path.exists('.env'):
+    load_dotenv()
 JWT_SECRET = os.environ.get('JWT_SECRET')
 if not JWT_SECRET:
     print("No 'JWT_SECRET' environment variable set")
@@ -42,6 +49,11 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+# =============================
+# Auth
+# =============================
 
 
 def create_access_token(*, data: models.User, expires_delta: timedelta = None) -> str:
@@ -101,7 +113,6 @@ async def login(
     }
 
 
-
 @app.get('/users/me')
 async def get_current_username(user: models.User = Depends(get_current_user)):
     return user.name
@@ -112,9 +123,10 @@ async def get_current_username(user: models.User = Depends(get_current_user)):
 # =============================
 
 
-@app.get('/articles', response_model=List[schemas.Article])
-async def articles_list(db: Session = Depends(get_db)) -> dict:
-    return db.query(models.Article).all()
+@app.get('/articles', response_model=List[Any])
+async def articles_list(db: Session = Depends(get_db)) -> List[dict]:
+    results = db.query(models.Article.id, models.Article.title).all()
+    return [{'id': r[0], 'title': r[1]} for r in results]
 
 
 @app.post('/articles')
